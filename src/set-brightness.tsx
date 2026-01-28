@@ -1,9 +1,6 @@
-import { ActionPanel, Action, List, showToast, Toast, getPreferenceValues } from "@raycast/api";
-import { execSync } from "child_process";
-
-interface Preferences {
-  litraPath: string;
-}
+import { ActionPanel, Action, List, Icon, Color } from "@raycast/api";
+import { useEffect, useState } from "react";
+import { setBrightness, getDeviceStatus } from "./litra";
 
 interface BrightnessOption {
   value: number;
@@ -24,38 +21,52 @@ const brightnessOptions: BrightnessOption[] = [
 ];
 
 export default function Command() {
-  const { litraPath } = getPreferenceValues<Preferences>();
+  const [currentBrightness, setCurrentBrightness] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  async function setBrightness(value: number) {
-    try {
-      execSync(`"${litraPath}" brightness --device-type glow --percentage ${value}`);
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Brightness set",
-        message: `${value}%`,
-      });
-    } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to set brightness",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+  useEffect(() => {
+    async function fetchStatus(): Promise<void> {
+      const status = await getDeviceStatus();
+      if (status?.brightness !== undefined) {
+        setCurrentBrightness(status.brightness);
+      }
+      setIsLoading(false);
+    }
+    fetchStatus();
+  }, []);
+
+  async function handleSetBrightness(value: number): Promise<void> {
+    const success = await setBrightness(value);
+    if (success) {
+      setCurrentBrightness(value);
     }
   }
 
+  const selectedId = currentBrightness !== null ? String(currentBrightness) : null;
+
   return (
-    <List searchBarPlaceholder="Search brightness...">
-      {brightnessOptions.map((option) => (
-        <List.Item
-          key={option.value}
-          title={option.label}
-          actions={
-            <ActionPanel>
-              <Action title="Set Brightness" onAction={() => setBrightness(option.value)} />
-            </ActionPanel>
-          }
-        />
-      ))}
+    <List
+      searchBarPlaceholder="Search brightness..."
+      isLoading={isLoading}
+      {...(selectedId && { selectedItemId: selectedId })}
+    >
+      {brightnessOptions.map((option) => {
+        const isCurrent = currentBrightness === option.value;
+        return (
+          <List.Item
+            key={option.value}
+            id={String(option.value)}
+            title={option.label}
+            icon={isCurrent ? { source: Icon.CheckCircle, tintColor: Color.Green } : Icon.Circle}
+            accessories={isCurrent ? [{ tag: { value: "Current", color: Color.Green } }] : []}
+            actions={
+              <ActionPanel>
+                <Action title="Set Brightness" onAction={() => handleSetBrightness(option.value)} />
+              </ActionPanel>
+            }
+          />
+        );
+      })}
     </List>
   );
 }

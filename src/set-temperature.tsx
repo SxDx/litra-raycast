@@ -1,9 +1,6 @@
-import { ActionPanel, Action, List, showToast, Toast, getPreferenceValues } from "@raycast/api";
-import { execSync } from "child_process";
-
-interface Preferences {
-  litraPath: string;
-}
+import { ActionPanel, Action, List, Icon, Color } from "@raycast/api";
+import { useEffect, useState } from "react";
+import { setTemperature, getDeviceStatus } from "./litra";
 
 interface TemperatureOption {
   value: number;
@@ -53,38 +50,52 @@ const temperatureOptions: TemperatureOption[] = [
 ];
 
 export default function Command() {
-  const { litraPath } = getPreferenceValues<Preferences>();
+  const [currentTemperature, setCurrentTemperature] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  async function setTemperature(value: number) {
-    try {
-      execSync(`"${litraPath}" temperature --device-type glow --value ${value}`);
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Temperature set",
-        message: `${value}K`,
-      });
-    } catch (error) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to set temperature",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+  useEffect(() => {
+    async function fetchStatus(): Promise<void> {
+      const status = await getDeviceStatus();
+      if (status?.temperature !== undefined) {
+        setCurrentTemperature(status.temperature);
+      }
+      setIsLoading(false);
+    }
+    fetchStatus();
+  }, []);
+
+  async function handleSetTemperature(value: number): Promise<void> {
+    const success = await setTemperature(value);
+    if (success) {
+      setCurrentTemperature(value);
     }
   }
 
+  const selectedId = currentTemperature !== null ? String(currentTemperature) : null;
+
   return (
-    <List searchBarPlaceholder="Search temperature...">
-      {temperatureOptions.map((option) => (
-        <List.Item
-          key={option.value}
-          title={option.label}
-          actions={
-            <ActionPanel>
-              <Action title="Set Temperature" onAction={() => setTemperature(option.value)} />
-            </ActionPanel>
-          }
-        />
-      ))}
+    <List
+      searchBarPlaceholder="Search temperature..."
+      isLoading={isLoading}
+      {...(selectedId && { selectedItemId: selectedId })}
+    >
+      {temperatureOptions.map((option) => {
+        const isCurrent = currentTemperature === option.value;
+        return (
+          <List.Item
+            key={option.value}
+            id={String(option.value)}
+            title={option.label}
+            icon={isCurrent ? { source: Icon.CheckCircle, tintColor: Color.Green } : Icon.Circle}
+            accessories={isCurrent ? [{ tag: { value: "Current", color: Color.Green } }] : []}
+            actions={
+              <ActionPanel>
+                <Action title="Set Temperature" onAction={() => handleSetTemperature(option.value)} />
+              </ActionPanel>
+            }
+          />
+        );
+      })}
     </List>
   );
 }

@@ -40,6 +40,12 @@
       "title": "Set Brightness",
       "description": "Set the brightness of the Litra Glow light",
       "mode": "view"
+    },
+    {
+      "name": "device-status",
+      "title": "Device Status",
+      "description": "View the current status of your Litra Glow light",
+      "mode": "view"
     }
   ],
   "dependencies": {
